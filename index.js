@@ -46,7 +46,7 @@ async function run() {
             result: result.insertedId,
           })
       } catch (error) {
-        res.status(500).json({error:"error creating user"});
+        res.status(500).json({error:"error  creating user"});
       }
     })
 
