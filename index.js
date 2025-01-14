@@ -27,6 +27,34 @@ async function run() {
     // Connect the client to the server	(optional starting in v4.7)
     await client.connect();
     // Send a ping to confirm a successful connection
+
+    const db=client.db("ParcelPro");
+    const ProductsCollection=db.collection("products");
+    const UserCollection=db.collection("users");
+    const OrdersCollection=db.collection("orders");
+
+    app.post('/users',async(req,res)=>{
+      const { email, displayName, photoURL } = req.body;
+      try {
+        const existingUser=await UserCollection.findOne({email});
+        if(existingUser){
+          return res.status(409).json({message:"User already exists"});
+          }
+          const result =await UserCollection.insertOne({email,displayName,photoURL});
+          res.json({
+            message: "User created successfully",
+            result: result.insertedId,
+          })
+      } catch (error) {
+        res.status(500).json({error:"error creating user"});
+      }
+    })
+
+
+    
+
+
+
     await client.db("admin").command({ ping: 1 });
     console.log("Pinged your deployment. You successfully connected to MongoDB!");
   } finally {
