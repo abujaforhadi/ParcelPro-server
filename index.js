@@ -2,15 +2,13 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 
-
 const app = express();
 const port = process.env.PORT || 3000;
 
 app.use(cors());
 app.use(express.json());
 
-
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion } = require("mongodb");
 const uri = `mongodb+srv://${process.env.user}:${process.env.pass}@cluster0.006kz.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
@@ -19,7 +17,7 @@ const client = new MongoClient(uri, {
     version: ServerApiVersion.v1,
     strict: true,
     deprecationErrors: true,
-  }
+  },
 });
 
 async function run() {
@@ -28,35 +26,53 @@ async function run() {
     await client.connect();
     // Send a ping to confirm a successful connection
 
-    const db=client.db("ParcelPro");
-    const ProductsCollection=db.collection("products");
-    const UserCollection=db.collection("users");
-    const OrdersCollection=db.collection("orders");
+    const db = client.db("ParcelPro");
+    const ProductsCollection = db.collection("products");
+    const UserCollection = db.collection("users");
+    const OrdersCollection = db.collection("orders");
 
-    app.post('/users',async(req,res)=>{
+    // store users in db
+    app.post("/users", async (req, res) => {
       const { email, displayName, photoURL } = req.body;
       try {
-        const existingUser=await UserCollection.findOne({email});
-        if(existingUser){
-          return res.status(409).json({message:"User already exists"});
-          }
-          const result =await UserCollection.insertOne({email,displayName,photoURL});
-          res.json({
-            message: "User created successfully",
-            result: result.insertedId,
-          })
+        const existingUser = await UserCollection.findOne({ email });
+        if (existingUser) {
+          return res.status(409).json({ message: "User already exists" });
+        }
+        const result = await UserCollection.insertOne({
+          email,
+          displayName,
+          photoURL,
+        });
+        res.json({
+          message: "User created successfully",
+          result: result.insertedId,
+        });
       } catch (error) {
-        res.status(500).json({error:"error  creating user"});
+        res.status(500).json({ error: "error  creating user" });
       }
-    })
+    });
 
+    // show users from db
+    app.get("/users", async (req, res) => {
+      try {
+        const users = await UserCollection.find().toArray();
+        res.json(users);
+      } catch (error) {
+        res.status(500).json({ error: "error fetching users" });
+      }
+    });
 
-    
-
-
+    app.post("/logout", (req, res) => {
+      res
+        .status(200)
+        .send({ success: true });
+    });
 
     await client.db("admin").command({ ping: 1 });
-    console.log("Pinged your deployment. You successfully connected to MongoDB!");
+    console.log(
+      "Pinged your deployment. You successfully connected to MongoDB!"
+    );
   } finally {
     // Ensures that the client will close when you finish/error
     // await client.close();
@@ -64,12 +80,10 @@ async function run() {
 }
 run().catch(console.dir);
 
-
-
 app.get("/", (req, res) => {
-    res.send("Welcome to the ParcelPro Server!");
-  });
-  
-  app.listen(port, () => {
-    console.log(`Server is running on http://localhost:${port}`);
-  });
+  res.send("Welcome to the ParcelPro Server!");
+});
+
+app.listen(port, () => {
+  console.log(`Server is running on http://localhost:${port}`);
+});
