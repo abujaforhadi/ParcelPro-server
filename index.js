@@ -1,6 +1,7 @@
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
+const jwt=require("jsonwebtoken")
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -30,6 +31,22 @@ async function run() {
     const ProductsCollection = db.collection("products");
     const UserCollection = db.collection("users");
     const OrdersCollection = db.collection("orders");
+
+
+    app.post("/jwt", async (req, res) => {
+      const email = req.body;
+      // create token
+      const token = jwt.sign(email, process.env.secret_key, {
+        expiresIn: "1h",
+      });
+      res
+        .cookie("token", token, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === "production",
+          sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
+        })
+        .send({ success: true });
+    });
 
     // store users in db
     app.post("/users", async (req, res) => {
@@ -65,7 +82,11 @@ async function run() {
 
     app.post("/logout", (req, res) => {
       res
-        .status(200)
+        .clearCookie("token", {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === "production",
+          sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
+        })
         .send({ success: true });
     });
 
