@@ -25,6 +25,7 @@ async function run() {
     await client.connect();
     const db = client.db("ParcelPro");
     const UserCollection = db.collection("users");
+    const ParcelCollection = db.collection("parcels");
 
     // Middleware to verify JWT
     const verifyToken = (req, res, next) => {
@@ -42,27 +43,51 @@ async function run() {
       }
     };
 
-    // Admin Check Route
-    app.get("/admin", verifyToken, async (req, res) => {
-      const email = req.user.email; // Extract email from token
+    app.post("/bookparcel", async (req, res) => {
       try {
-        const user = await UserCollection.findOne({ email });
-        if (user && user.role === "admin") {
-          res.json({ isAdmin: true, message: "User is an admin" });
-        } else {
-          res
-            .status(403)
-            .json({
-              isAdmin: false,
-              message: "Access denied. User is not an admin.",
-            });
-        }
+        const parcelData = req.body; // Ensure all required fields are passed
+        parcelData.status = "pending"; // Default status
+        const result = await ParcelCollection.insertOne(parcelData); // Save to MongoDB
+        res.status(200).json({ message: "Parcel booked successfully", result });
       } catch (error) {
-        res.status(500).json({ error: "Error checking admin status" });
+        console.error("Error booking parcel:", error);
+        res.status(500).json({ message: "Failed to book parcel" });
       }
     });
-
-    // Other Routes...
+    app.patch("/parcels/:id", async (req, res) => {
+      const { id } = req.params;
+      const { status } = req.body;
+    
+      if (!["pending", "on the way", "delivered", "returned", "canceled"].includes(status)) {
+        return res.status(400).json({ message: "Invalid status" });
+      }
+    
+      try {
+        const result = await ParcelCollection.updateOne(
+          { _id: new ObjectId(id) },
+          { $set: { status } }
+        );
+    
+        if (result.matchedCount === 0) {
+          return res.status(404).json({ message: "Parcel not found" });
+        }
+    
+        res.json({ message: "Parcel status updated successfully" });
+      } catch (error) {
+        res.status(500).json({ message: "Failed to update parcel status" });
+      }
+    });
+    
+    app.get("/myparcels", async (req, res) => {
+      const { email } = req.query; 
+      try {
+        const parcels = await ParcelCollection.find({ email }).toArray();
+        res.status(200).json(parcels);
+      } catch (error) {
+        res.status(500).json({ message: "Failed to fetch parcels" });
+      }
+    });
+    
     app.get("/users", async (req, res) => {
       try {
         const users = await UserCollection.find().toArray();
@@ -114,9 +139,8 @@ async function run() {
         res.status(500).json({ error: "Error updating role" });
       }
     });
-    // Fetch a user by email
     app.get("/adminUsers", async (req, res) => {
-      const email = req.query.email; // Read email from query params
+      const email = req.query.email; 
       try {
         const user = await UserCollection.findOne({ email });
         if (!user) {
