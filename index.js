@@ -47,6 +47,7 @@ async function run() {
       try {
         const parcelData = req.body;
 
+
         parcelData.status = "pending";
         parcelData.bookingDate = new Date().toISOString().split("T")[0];
 
@@ -94,6 +95,49 @@ async function run() {
         res.status(500).json({ message: "Failed to fetch parcels" });
       }
     });
+    // Endpoint to filter parcels by date range
+app.get("/allparcels", async (req, res) => {
+  const { startDate, endDate } = req.query;
+  const filter = {};
+  
+  if (startDate && endDate) {
+    filter.requestedDeliveryDate = {
+      $gte: new Date(startDate),
+      $lte: new Date(endDate),
+    };
+  }
+
+  try {
+    const parcels = await ParcelCollection.find(filter).toArray();
+    res.status(200).json(parcels);
+  } catch (error) {
+    res.status(500).json({ message: "Error fetching parcels" });
+  }
+});
+
+// Endpoint to update parcel with delivery man and status
+app.put("/updateparcel/:id", async (req, res) => {
+  const { id } = req.params;
+  const { status, deliveryMenId, approximateDeliveryDate } = req.body;
+
+  try {
+    const result = await ParcelCollection.updateOne(
+      { _id: new ObjectId(id) },
+      {
+        $set: {
+          status,
+          deliveryMenId,
+          approximateDeliveryDate,
+        },
+      }
+    );
+
+    res.status(200).json({ message: "Parcel updated successfully", result });
+  } catch (error) {
+    res.status(500).json({ message: "Error updating parcel" });
+  }
+});
+
 
     app.get("/users", async (req, res) => {
       try {
