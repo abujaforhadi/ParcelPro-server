@@ -342,6 +342,16 @@ app.patch('/userupdate/:id', async (req, res) => {
       }
     });
 
+    app.get("/allreview",async(req,res)=>{
+      try{
+        const reviews=await ReviewCollection.find().toArray()
+        res.status(200).json({reviews})
+        }catch(error){
+          console.error("Failed to fetch reviews:", error);
+          res.status(500).json({ message: "Failed to fetch reviews", error });
+          }
+    })
+
     app.get("/reviews", async (req, res) => {
       const { deliveryManId } = req.query;
       // console.log(deliveryManId);
