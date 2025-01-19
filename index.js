@@ -26,6 +26,8 @@ async function run() {
     const db = client.db("ParcelPro");
     const UserCollection = db.collection("users");
     const ParcelCollection = db.collection("parcels");
+    const ReviewCollection = db.collection("reviews");
+
 
     // Middleware to verify JWT
     const verifyToken = (req, res, next) => {
@@ -46,7 +48,6 @@ async function run() {
     app.post("/bookparcel", async (req, res) => {
       try {
         const parcelData = req.body;
-
 
         parcelData.status = "pending";
         parcelData.bookingDate = new Date().toISOString().split("T")[0];
@@ -95,49 +96,65 @@ async function run() {
         res.status(500).json({ message: "Failed to fetch parcels" });
       }
     });
-    // Endpoint to filter parcels by date range
-app.get("/allparcels", async (req, res) => {
-  const { startDate, endDate } = req.query;
-  const filter = {};
-  
-  if (startDate && endDate) {
-    filter.requestedDeliveryDate = {
-      $gte: new Date(startDate),
-      $lte: new Date(endDate),
-    };
-  }
-
-  try {
-    const parcels = await ParcelCollection.find(filter).toArray();
-    res.status(200).json(parcels);
-  } catch (error) {
-    res.status(500).json({ message: "Error fetching parcels" });
-  }
-});
-
-// Endpoint to update parcel with delivery man and status
-app.put("/updateparcel/:id", async (req, res) => {
-  const { id } = req.params;
-  const { status, deliveryMenId, approximateDeliveryDate } = req.body;
-
-  try {
-    const result = await ParcelCollection.updateOne(
-      { _id: new ObjectId(id) },
-      {
-        $set: {
-          status,
-          deliveryMenId,
-          approximateDeliveryDate,
-        },
+    app.get("/myreviews", async (req, res) => {
+      const { deliveryManId } = req.query; 
+    
+      // console.log(deliveryManId); // Debugging the deliveryManId
+    
+      try {
+        const reviews = await ReviewCollection.find({
+          deliveryManId: new ObjectId(deliveryManId), 
+        }).toArray();
+        res.status(200).json(reviews); 
+      } catch (error) {
+        res.status(500).json({ message: "Failed to fetch reviews", error });
       }
-    );
+    });
+    
+    app.get("/allparcels", async (req, res) => {
+      const { startDate, endDate } = req.query;
+      const filter = {};
 
-    res.status(200).json({ message: "Parcel updated successfully", result });
-  } catch (error) {
-    res.status(500).json({ message: "Error updating parcel" });
-  }
-});
+      if (startDate && endDate) {
+        filter.requestedDeliveryDate = {
+          $gte: new Date(startDate),
+          $lte: new Date(endDate),
+        };
+      }
 
+      try {
+        const parcels = await ParcelCollection.find(filter).toArray();
+        res.status(200).json(parcels);
+      } catch (error) {
+        res.status(500).json({ message: "Error fetching parcels" });
+      }
+    });
+
+    // Endpoint to update parcel with delivery man and status
+    app.put("/updateparcel/:id", async (req, res) => {
+      const { id } = req.params;
+      const { status, deliveryMenId, approximateDeliveryDate } = req.body;
+      // console.log(status, deliveryMenId);
+
+      try {
+        const result = await ParcelCollection.updateOne(
+          { _id: new ObjectId(id) },
+          {
+            $set: {
+              status,
+              deliveryMenId,
+              approximateDeliveryDate,
+            },
+          }
+        );
+
+        res
+          .status(200)
+          .json({ message: "Parcel updated successfully", result });
+      } catch (error) {
+        res.status(500).json({ message: "Error updating parcel" });
+      }
+    });
 
     app.get("/users", async (req, res) => {
       try {
@@ -166,6 +183,28 @@ app.put("/updateparcel/:id", async (req, res) => {
         res.status(500).json({ error: "Error creating user" });
       }
     });
+    // Backend Route to Update User Information
+app.patch('/userupdate/:id', async (req, res) => {
+  const { id } = req.params; // User ID from the URL
+  const updatedData = req.body; // Data sent from the frontend
+
+  try {
+    const result = await UserCollection.updateOne(
+      { _id: new ObjectId(id) }, // Find user by ID
+      { $set: updatedData } // Update fields
+    );
+
+    if (result.matchedCount === 0) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    res.status(200).json({ message: 'User updated successfully', result });
+  } catch (error) {
+    console.error('Error updating user:', error);
+    res.status(500).json({ message: 'Failed to update user', error });
+  }
+});
+
 
     app.patch("/users/:id", async (req, res) => {
       const { id } = req.params;
@@ -190,6 +229,10 @@ app.put("/updateparcel/:id", async (req, res) => {
         res.status(500).json({ error: "Error updating role" });
       }
     });
+    
+    
+    
+    
     app.get("/adminUsers", async (req, res) => {
       const email = req.query.email;
       try {
@@ -225,7 +268,6 @@ app.put("/updateparcel/:id", async (req, res) => {
 
     app.get("/admin/stats", async (req, res) => {
       try {
-        // Aggregate bookings by date
         const bookingsByDate = await ParcelCollection.aggregate([
           {
             $group: {
@@ -235,10 +277,9 @@ app.put("/updateparcel/:id", async (req, res) => {
               count: { $sum: 1 },
             },
           },
-          { $sort: { _id: 1 } }, // Sort by date
+          { $sort: { _id: 1 } },
         ]).toArray();
 
-        // Aggregate comparison between booked and delivered parcels per day
         const parcelsComparison = await ParcelCollection.aggregate([
           {
             $group: {
@@ -272,6 +313,66 @@ app.put("/updateparcel/:id", async (req, res) => {
         });
       } catch (error) {
         res.status(500).json({ message: "Failed to fetch statistics" });
+      }
+    });
+
+     // Review endpoints
+     app.post("/reviews", async (req, res) => {
+      const { deliveryManId, giverName, giverImage, rating, feedback } = req.body;
+    
+      if (!deliveryManId || !rating || !feedback) {
+        return res.status(400).json({ message: "Required fields are missing" });
+      }
+    
+      try {
+        const review = {
+          deliveryManId: new ObjectId(deliveryManId), // Convert to ObjectId if necessary
+          giverName,
+          giverImage,
+          rating,
+          feedback,
+          date: new Date(),
+        };
+    
+        const result = await ReviewCollection.insertOne(review);
+        res.status(200).json({ message: "Review added successfully", result });
+      } catch (error) {
+        console.error("Failed to add review:", error);
+        res.status(500).json({ message: "Failed to add review", error });
+      }
+    });
+
+    app.get("/reviews", async (req, res) => {
+      const { deliveryManId } = req.query;
+      // console.log(deliveryManId);
+    
+      if (!deliveryManId) {
+        return res.status(400).json({ message: "DeliveryManId is required" });
+      }
+    
+      try {
+        // Ensure deliveryManId is converted to ObjectId for MongoDB query
+        const reviews = await ReviewCollection.find({
+          deliveryManId: new ObjectId(deliveryManId), // Convert to ObjectId
+        }).toArray();
+        res.status(200).json(reviews);
+      } catch (error) {
+        res.status(500).json({ message: "Failed to fetch reviews", error });
+      }
+    });
+    
+
+    app.delete("/reviews/:id", async (req, res) => {
+      const { id } = req.params;
+
+      try {
+        const result = await ReviewCollection.deleteOne({ _id: new ObjectId(id) });
+        if (result.deletedCount === 0) {
+          return res.status(404).json({ message: "Review not found" });
+        }
+        res.json({ message: "Review deleted successfully" });
+      } catch (error) {
+        res.status(500).json({ message: "Failed to delete review", error });
       }
     });
 
