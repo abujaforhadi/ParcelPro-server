@@ -28,7 +28,6 @@ async function run() {
     const ParcelCollection = db.collection("parcels");
     const ReviewCollection = db.collection("reviews");
 
-
     // Middleware to verify JWT
     const verifyToken = (req, res, next) => {
       const authHeader = req.headers.authorization;
@@ -86,6 +85,28 @@ async function run() {
       }
     });
 
+    app.put("/updateparcels/:id", async (req, res) => {
+      const { id } = req.params;
+      const updateFields = req.body;
+      delete updateFields._id;
+
+      try {
+        const result = await ParcelCollection.updateOne(
+          { _id: new ObjectId(id) },
+          { $set: updateFields }
+        );
+
+        if (result.matchedCount === 0) {
+          return res.status(404).json({ message: "Parcel not found" });
+        }
+
+        res.status(200).json({ message: "Parcel updated successfully" });
+      } catch (error) {
+        console.error("Error updating parcel:", error);
+        res.status(500).json({ message: "Failed to update parcel", error });
+      }
+    });
+
     app.get("/myparcels", async (req, res) => {
       const { email } = req.query;
       // console.log(email);
@@ -97,20 +118,20 @@ async function run() {
       }
     });
     app.get("/myreviews", async (req, res) => {
-      const { deliveryManId } = req.query; 
-    
+      const { deliveryManId } = req.query;
+
       // console.log(deliveryManId); // Debugging the deliveryManId
-    
+
       try {
         const reviews = await ReviewCollection.find({
-          deliveryManId: new ObjectId(deliveryManId), 
+          deliveryManId: new ObjectId(deliveryManId),
         }).toArray();
-        res.status(200).json(reviews); 
+        res.status(200).json(reviews);
       } catch (error) {
         res.status(500).json({ message: "Failed to fetch reviews", error });
       }
     });
-    
+
     app.get("/allparcels", async (req, res) => {
       const { startDate, endDate } = req.query;
       const filter = {};
@@ -184,27 +205,26 @@ async function run() {
       }
     });
     // Backend Route to Update User Information
-app.patch('/userupdate/:id', async (req, res) => {
-  const { id } = req.params; // User ID from the URL
-  const updatedData = req.body; // Data sent from the frontend
+    app.patch("/userupdate/:id", async (req, res) => {
+      const { id } = req.params; 
+      const updatedData = req.body; 
 
-  try {
-    const result = await UserCollection.updateOne(
-      { _id: new ObjectId(id) }, // Find user by ID
-      { $set: updatedData } // Update fields
-    );
+      try {
+        const result = await UserCollection.updateOne(
+          { _id: new ObjectId(id) },
+          { $set: updatedData }
+        );
 
-    if (result.matchedCount === 0) {
-      return res.status(404).json({ message: 'User not found' });
-    }
+        if (result.matchedCount === 0) {
+          return res.status(404).json({ message: "User not found" });
+        }
 
-    res.status(200).json({ message: 'User updated successfully', result });
-  } catch (error) {
-    console.error('Error updating user:', error);
-    res.status(500).json({ message: 'Failed to update user', error });
-  }
-});
-
+        res.status(200).json({ message: "User updated successfully", result });
+      } catch (error) {
+        console.error("Error updating user:", error);
+        res.status(500).json({ message: "Failed to update user", error });
+      }
+    });
 
     app.patch("/users/:id", async (req, res) => {
       const { id } = req.params;
@@ -229,10 +249,7 @@ app.patch('/userupdate/:id', async (req, res) => {
         res.status(500).json({ error: "Error updating role" });
       }
     });
-    
-    
-    
-    
+
     app.get("/adminUsers", async (req, res) => {
       const email = req.query.email;
       try {
@@ -292,7 +309,7 @@ app.patch('/userupdate/:id', async (req, res) => {
               },
             },
           },
-          { $sort: { _id: 1 } }, // Sort by date
+          { $sort: { _id: 1 } },
         ]).toArray();
 
         // Format the data for the front-end
@@ -316,24 +333,25 @@ app.patch('/userupdate/:id', async (req, res) => {
       }
     });
 
-     // Review endpoints
-     app.post("/reviews", async (req, res) => {
-      const { deliveryManId, giverName, giverImage, rating, feedback } = req.body;
-    
+    // Review endpoints
+    app.post("/reviews", async (req, res) => {
+      const { deliveryManId, giverName, giverImage, rating, feedback } =
+        req.body;
+
       if (!deliveryManId || !rating || !feedback) {
         return res.status(400).json({ message: "Required fields are missing" });
       }
-    
+
       try {
         const review = {
-          deliveryManId: new ObjectId(deliveryManId), // Convert to ObjectId if necessary
+          deliveryManId: new ObjectId(deliveryManId), 
           giverName,
           giverImage,
           rating,
           feedback,
           date: new Date(),
         };
-    
+
         const result = await ReviewCollection.insertOne(review);
         res.status(200).json({ message: "Review added successfully", result });
       } catch (error) {
@@ -342,41 +360,41 @@ app.patch('/userupdate/:id', async (req, res) => {
       }
     });
 
-    app.get("/allreview",async(req,res)=>{
-      try{
-        const reviews=await ReviewCollection.find().toArray()
-        res.status(200).json({reviews})
-        }catch(error){
-          console.error("Failed to fetch reviews:", error);
-          res.status(500).json({ message: "Failed to fetch reviews", error });
-          }
-    })
+    app.get("/allreview", async (req, res) => {
+      try {
+        const reviews = await ReviewCollection.find().toArray();
+        res.status(200).json({ reviews });
+      } catch (error) {
+        console.error("Failed to fetch reviews:", error);
+        res.status(500).json({ message: "Failed to fetch reviews", error });
+      }
+    });
 
     app.get("/reviews", async (req, res) => {
       const { deliveryManId } = req.query;
       // console.log(deliveryManId);
-    
+
       if (!deliveryManId) {
         return res.status(400).json({ message: "DeliveryManId is required" });
       }
-    
+
       try {
-        // Ensure deliveryManId is converted to ObjectId for MongoDB query
         const reviews = await ReviewCollection.find({
-          deliveryManId: new ObjectId(deliveryManId), // Convert to ObjectId
+          deliveryManId: new ObjectId(deliveryManId),
         }).toArray();
         res.status(200).json(reviews);
       } catch (error) {
         res.status(500).json({ message: "Failed to fetch reviews", error });
       }
     });
-    
 
     app.delete("/reviews/:id", async (req, res) => {
       const { id } = req.params;
 
       try {
-        const result = await ReviewCollection.deleteOne({ _id: new ObjectId(id) });
+        const result = await ReviewCollection.deleteOne({
+          _id: new ObjectId(id),
+        });
         if (result.deletedCount === 0) {
           return res.status(404).json({ message: "Review not found" });
         }
