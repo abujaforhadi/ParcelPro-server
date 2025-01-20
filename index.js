@@ -22,7 +22,7 @@ const client = new MongoClient(uri, {
 
 async function run() {
   try {
-    await client.connect();
+    // await client.connect();
     const db = client.db("ParcelPro");
     const UserCollection = db.collection("users");
     const ParcelCollection = db.collection("parcels");
@@ -386,8 +386,8 @@ app.patch('/userupdate/:id', async (req, res) => {
       }
     });
 
-    await client.db("admin").command({ ping: 1 });
-    console.log("Connected to MongoDB!");
+    // await client.db("admin").command({ ping: 1 });
+    // console.log("Connected to MongoDB!");
   } finally {
     // Do not close the client for production apps
   }
