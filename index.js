@@ -185,6 +185,14 @@ async function run() {
         res.status(500).json({ error: "Error fetching users" });
       }
     });
+    app.get("/totaluser", async (req, res) => {
+      try {
+        const users = await UserCollection.find().toArray();
+        res.json(users);
+      } catch (error) {
+        res.status(500).json({ error: "Error fetching users" });
+      }
+    });
 
     app.post("/users", async (req, res) => {
       const { email, displayName, photoURL } = req.body;
