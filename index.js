@@ -2,6 +2,8 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const jwt = require("jsonwebtoken");
+const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
+
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -27,12 +29,12 @@ async function run() {
     const UserCollection = db.collection("users");
     const ParcelCollection = db.collection("parcels");
     const ReviewCollection = db.collection("reviews");
-// create JWT token
-    app.post('/jwt', async (req, res) => {
+    // create JWT token
+    app.post("/jwt", async (req, res) => {
       const user = req.body;
-      const token = jwt.sign(user, process.env.secret_key, { expiresIn: '1h' });
+      const token = jwt.sign(user, process.env.secret_key, { expiresIn: "1h" });
       res.send({ token });
-    })
+    });
 
     // Middleware to verify JWT
     const verifyToken = (req, res, next) => {
@@ -49,31 +51,32 @@ async function run() {
         res.status(403).json({ message: "Invalid or expired token" });
       }
     };
-   
+
     const verifyAdmin = async (req, res, next) => {
       const authHeader = req.headers.authorization;
       if (!authHeader) {
         return res.status(401).json({ message: "No token provided" });
       }
       const token = authHeader.split(" ")[1];
-    
+
       try {
         const decoded = jwt.verify(token, process.env.secret_key);
         req.user = decoded;
-    
+
         const user = await UserCollection.findOne({ email: decoded.email });
         if (!user || user.role !== "admin") {
-          return res.status(403).json({ message: "Forbidden access: Admins only" });
+          return res
+            .status(403)
+            .json({ message: "Forbidden access: Admins only" });
         }
-    
-        next();  
+
+        next();
       } catch (error) {
         res.status(403).json({ message: "Invalid or expired token" });
       }
     };
-    
 
-    app.post("/bookparcel",verifyToken, async (req, res) => {
+    app.post("/bookparcel", verifyToken, async (req, res) => {
       try {
         const parcelData = req.body;
 
@@ -90,22 +93,24 @@ async function run() {
 
     app.patch("/parcelcancel/:id", async (req, res) => {
       const { id } = req.params;
-      const { status } = req.body; 
-    
-      if (!["Pending", "On The Way", "Delivered", "Canceled"].includes(status)) {
+      const { status } = req.body;
+
+      if (
+        !["Pending", "On The Way", "Delivered", "Canceled"].includes(status)
+      ) {
         return res.status(400).json({ message: "Invalid status" });
       }
-    
+
       try {
         const result = await ParcelCollection.updateOne(
-          { _id: new ObjectId(id) }, 
+          { _id: new ObjectId(id) },
           { $set: { status } }
         );
-    
+
         if (result.matchedCount === 0) {
           return res.status(404).json({ message: "Parcel not found" });
         }
-    
+
         res.json({ message: "Parcel status updated successfully" });
       } catch (error) {
         console.error("Error updating parcel status:", error);
@@ -113,7 +118,7 @@ async function run() {
       }
     });
 
-    app.patch("/parcels/:id",verifyToken, async (req, res) => {
+    app.patch("/parcels/:id", verifyToken, async (req, res) => {
       const { id } = req.params;
       const { status } = req.body;
 
@@ -139,7 +144,7 @@ async function run() {
       }
     });
 
-    app.put("/updateparcels/:id",verifyToken, async (req, res) => {
+    app.put("/updateparcels/:id", verifyToken, async (req, res) => {
       const { id } = req.params;
       const updateFields = req.body;
       delete updateFields._id;
@@ -171,11 +176,10 @@ async function run() {
         res.status(500).json({ message: "Failed to fetch parcels" });
       }
     });
-    app.get("/myreviews",verifyToken, async (req, res) => {
+    app.get("/myreviews", verifyToken, async (req, res) => {
       const { deliveryManId } = req.query;
 
-
-      // console.log(deliveryManId); 
+      // console.log(deliveryManId);
 
       try {
         const reviews = await ReviewCollection.find({
@@ -267,10 +271,30 @@ async function run() {
         res.status(500).json({ error: "Error creating user" });
       }
     });
+    app.patch("/userupdatedelivery/:id", async (req, res) => {
+      const { id } = req.params;
+      const { parcelsDelivered } = req.body;
+
+      try {
+        const result = await UserCollection.updateOne(
+          { _id: new ObjectId(id) },
+          { $set: { parcelsDelivered } }
+        );
+
+        if (result.matchedCount === 0) {
+          return res.status(404).json({ message: "User not found" });
+        }
+
+        res.status(200).json({ message: "User updated successfully", result });
+      } catch (error) {
+        console.error("Error updating user:", error);
+        res.status(500).json({ message: "Failed to update user", error });
+      }
+    });
 
     app.patch("/userupdate/:id", async (req, res) => {
-      const { id } = req.params; 
-      const updatedData = req.body; 
+      const { id } = req.params;
+      const updatedData = req.body;
 
       try {
         const result = await UserCollection.updateOne(
@@ -289,7 +313,7 @@ async function run() {
       }
     });
 
-    app.patch("/users/:id",verifyToken,verifyAdmin, async (req, res) => {
+    app.patch("/users/:id", verifyToken, verifyAdmin, async (req, res) => {
       const { id } = req.params;
       const { role } = req.body;
 
@@ -328,23 +352,23 @@ async function run() {
 
     app.delete("/users/:id", verifyToken, verifyAdmin, async (req, res) => {
       const { id } = req.params;
-    
+
       try {
-        // console.log(" delete user with id:", id); 
-    
+        // console.log(" delete user with id:", id);
+
         if (!ObjectId.isValid(id)) {
           return res.status(400).json({ message: "Invalid user ID" });
         }
-    
+
         const result = await UserCollection.deleteOne({
           _id: new ObjectId(id),
         });
-    
+
         if (result.deletedCount === 0) {
           console.log("No user found to delete");
           return res.status(404).json({ message: "User not found" });
         }
-    
+
         console.log("User deleted successfully");
         res.json({ message: "User deleted successfully" });
       } catch (error) {
@@ -352,7 +376,7 @@ async function run() {
         res.status(500).json({ error: "Error deleting user" });
       }
     });
-  
+
     //admin logic
 
     app.get("/admin/stats", async (req, res) => {
@@ -415,7 +439,7 @@ async function run() {
 
       try {
         const review = {
-          deliveryManId: new ObjectId(deliveryManId), 
+          deliveryManId: new ObjectId(deliveryManId),
           giverName,
           giverImage,
           rating,
@@ -458,6 +482,19 @@ async function run() {
         res.status(500).json({ message: "Failed to fetch reviews", error });
       }
     });
+
+   app.post("/create-payment-intent", async (req, res) => {
+  const { amount, currency } = req.body;
+  try {
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount, // Amount in cents
+      currency,
+    });
+    res.json(paymentIntent.client_secret);
+  } catch (error) {
+    res.status(500).send(error.message);
+  }
+});
 
     app.delete("/reviews/:id", async (req, res) => {
       const { id } = req.params;
