@@ -27,6 +27,12 @@ async function run() {
     const UserCollection = db.collection("users");
     const ParcelCollection = db.collection("parcels");
     const ReviewCollection = db.collection("reviews");
+// create JWT token
+    app.post('/jwt', async (req, res) => {
+      const user = req.body;
+      const token = jwt.sign(user, process.env.secret_key, { expiresIn: '1h' });
+      res.send({ token });
+    })
 
     // Middleware to verify JWT
     const verifyToken = (req, res, next) => {
@@ -43,8 +49,31 @@ async function run() {
         res.status(403).json({ message: "Invalid or expired token" });
       }
     };
+   
+    const verifyAdmin = async (req, res, next) => {
+      const authHeader = req.headers.authorization;
+      if (!authHeader) {
+        return res.status(401).json({ message: "No token provided" });
+      }
+      const token = authHeader.split(" ")[1];
+    
+      try {
+        const decoded = jwt.verify(token, process.env.secret_key);
+        req.user = decoded;
+    
+        const user = await UserCollection.findOne({ email: decoded.email });
+        if (!user || user.role !== "admin") {
+          return res.status(403).json({ message: "Forbidden access: Admins only" });
+        }
+    
+        next();  
+      } catch (error) {
+        res.status(403).json({ message: "Invalid or expired token" });
+      }
+    };
+    
 
-    app.post("/bookparcel", async (req, res) => {
+    app.post("/bookparcel",verifyToken, async (req, res) => {
       try {
         const parcelData = req.body;
 
@@ -59,7 +88,7 @@ async function run() {
       }
     });
 
-    app.patch("/parcels/:id", async (req, res) => {
+    app.patch("/parcels/:id",verifyToken, async (req, res) => {
       const { id } = req.params;
       const { status } = req.body;
 
@@ -85,7 +114,7 @@ async function run() {
       }
     });
 
-    app.put("/updateparcels/:id", async (req, res) => {
+    app.put("/updateparcels/:id",verifyToken, async (req, res) => {
       const { id } = req.params;
       const updateFields = req.body;
       delete updateFields._id;
@@ -117,10 +146,10 @@ async function run() {
         res.status(500).json({ message: "Failed to fetch parcels" });
       }
     });
-    app.get("/myreviews", async (req, res) => {
+    app.get("/myreviews",verifyToken, async (req, res) => {
       const { deliveryManId } = req.query;
 
-      // console.log(deliveryManId); // Debugging the deliveryManId
+      // console.log(deliveryManId); 
 
       try {
         const reviews = await ReviewCollection.find({
@@ -234,7 +263,7 @@ async function run() {
       }
     });
 
-    app.patch("/users/:id", async (req, res) => {
+    app.patch("/users/:id",verifyToken,verifyAdmin, async (req, res) => {
       const { id } = req.params;
       const { role } = req.body;
 
@@ -271,24 +300,34 @@ async function run() {
       }
     });
 
-    app.delete("/users/:id", async (req, res) => {
+    app.delete("/users/:id", verifyToken, verifyAdmin, async (req, res) => {
       const { id } = req.params;
-
+    
       try {
+        // console.log("Attempting to delete user with id:", id); 
+    
+        // Ensure the ID is valid
+        if (!ObjectId.isValid(id)) {
+          return res.status(400).json({ message: "Invalid user ID" });
+        }
+    
         const result = await UserCollection.deleteOne({
           _id: new ObjectId(id),
         });
-
+    
         if (result.deletedCount === 0) {
+          console.log("No user found to delete");
           return res.status(404).json({ message: "User not found" });
         }
-
+    
+        console.log("User deleted successfully");
         res.json({ message: "User deleted successfully" });
       } catch (error) {
+        console.error("Error deleting user:", error);
         res.status(500).json({ error: "Error deleting user" });
       }
     });
-
+  
     //admin logic
 
     app.get("/admin/stats", async (req, res) => {
@@ -320,7 +359,6 @@ async function run() {
           { $sort: { _id: 1 } },
         ]).toArray();
 
-        // Format the data for the front-end
         const formattedBookingsByDate = bookingsByDate.map((entry) => ({
           date: entry._id,
           bookings: entry.count,
