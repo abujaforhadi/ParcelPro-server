@@ -428,6 +428,56 @@ async function run() {
       }
     });
 
+    app.get("/all-parcels", async (req, res) => {
+      const { startDate, endDate, page = 1, limit = 10 } = req.query;
+    
+      // Validate the page and limit
+      const pageNumber = parseInt(page, 10);
+      const limitNumber = parseInt(limit, 10);
+    
+      if (isNaN(pageNumber) || isNaN(limitNumber) || pageNumber < 1 || limitNumber < 1) {
+        return res.status(400).json({ message: "Invalid page or limit value" });
+      }
+    
+      const filters = {};
+      if (startDate && endDate) {
+        const start = new Date(startDate);
+        const end = new Date(endDate);
+    
+        if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+          return res.status(400).json({ message: "Invalid start or end date format" });
+        }
+    
+        filters.requestedDeliveryDate = {
+          $gte: start,
+          $lte: end,
+        };
+      }
+    
+      try {
+        // Get total parcel count based on the filters
+        const totalParcels = await ParcelCollection.countDocuments(filters);
+    
+        // Fetch parcels with pagination
+        const parcels = await ParcelCollection.find(filters)
+          .skip((pageNumber - 1) * limitNumber)
+          .limit(limitNumber)
+          .toArray();
+    
+        // Return the paginated result
+        res.json({
+          parcels,
+          totalParcels,
+          totalPages: Math.ceil(totalParcels / limitNumber),
+          currentPage: pageNumber,
+        });
+      } catch (error) {
+        console.error("Error fetching parcels:", error);
+        res.status(500).json({ message: "Failed to fetch parcels", error });
+      }
+    });
+    
+
     // Review endpoints
     app.post("/reviews", async (req, res) => {
       const { deliveryManId, giverName, giverImage, rating, feedback } =
