@@ -77,7 +77,7 @@ async function run() {
       try {
         const parcelData = req.body;
 
-        parcelData.status = "pending";
+        parcelData.status = "Pending";
         parcelData.bookingDate = new Date().toISOString().split("T")[0];
 
         const result = await ParcelCollection.insertOne(parcelData);
@@ -88,12 +88,37 @@ async function run() {
       }
     });
 
+    app.patch("/parcelcancel/:id", async (req, res) => {
+      const { id } = req.params;
+      const { status } = req.body; 
+    
+      if (!["Pending", "On The Way", "Delivered", "Canceled"].includes(status)) {
+        return res.status(400).json({ message: "Invalid status" });
+      }
+    
+      try {
+        const result = await ParcelCollection.updateOne(
+          { _id: new ObjectId(id) }, 
+          { $set: { status } }
+        );
+    
+        if (result.matchedCount === 0) {
+          return res.status(404).json({ message: "Parcel not found" });
+        }
+    
+        res.json({ message: "Parcel status updated successfully" });
+      } catch (error) {
+        console.error("Error updating parcel status:", error);
+        res.status(500).json({ message: "Failed to update parcel status" });
+      }
+    });
+
     app.patch("/parcels/:id",verifyToken, async (req, res) => {
       const { id } = req.params;
       const { status } = req.body;
 
       if (
-        !["pending", "on the way", "delivered", "canceled"].includes(status)
+        !["Pending", "on the way", "delivered", "canceled"].includes(status)
       ) {
         return res.status(400).json({ message: "Invalid status" });
       }
@@ -148,6 +173,7 @@ async function run() {
     });
     app.get("/myreviews",verifyToken, async (req, res) => {
       const { deliveryManId } = req.query;
+
 
       // console.log(deliveryManId); 
 
@@ -241,7 +267,7 @@ async function run() {
         res.status(500).json({ error: "Error creating user" });
       }
     });
-    // Backend Route to Update User Information
+
     app.patch("/userupdate/:id", async (req, res) => {
       const { id } = req.params; 
       const updatedData = req.body; 
@@ -304,9 +330,8 @@ async function run() {
       const { id } = req.params;
     
       try {
-        // console.log("Attempting to delete user with id:", id); 
+        // console.log(" delete user with id:", id); 
     
-        // Ensure the ID is valid
         if (!ObjectId.isValid(id)) {
           return res.status(400).json({ message: "Invalid user ID" });
         }
