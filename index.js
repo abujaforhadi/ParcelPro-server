@@ -431,7 +431,6 @@ async function run() {
     app.get("/all-parcels", async (req, res) => {
       const { startDate, endDate, page = 1, limit = 10 } = req.query;
     
-      // Validate the page and limit
       const pageNumber = parseInt(page, 10);
       const limitNumber = parseInt(limit, 10);
     
