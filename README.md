@@ -35,7 +35,7 @@ Welcome to the ParcelPro Server! This server serves as the backend for the Parce
 ## Setup Instructions
 1. Clone the repository:
    ```bash
-   git clone <repository-url>
+   git clone https://github.com/abujaforhadi/ParcelPro-server.git
    cd ParcelPro-Server
    ```
 2. Install dependencies:
